@@ -120,10 +120,10 @@ pub fn replay(test_file: String, device_name: String) -> Result<()> {
 	thread::sleep(time::Duration::from_millis(800));
 
 	let all_devices = get_all_uinput_device_names_to_paths()?;
-	let mapped_device_path = all_devices.get(&*format!("Kbct-{}", device_name)).expect(
+	let mapped_device_path = &all_devices.get(&*format!("Kbct-{}-0", device_name)).expect(
 		"The mapped device is not mounted yet, make sure you run kbct in parallel before replay",
-	);
-	let mapped_device_file = open_readable_uinput_device(mapped_device_path, true)?;
+	)[0];
+	let mapped_device_file = open_readable_uinput_device(&mapped_device_path, true)?;
 
 	let lines = {
 		let file = File::open(test_file)?;

@@ -40,7 +40,7 @@ pub fn get_uinput_device_name(dev_file_path: &String) -> Result<Option<String>> 
 	}
 }
 
-pub fn get_all_uinput_device_names_to_paths() -> Result<HashMap<String, String>> {
+pub fn get_all_uinput_device_names_to_paths() -> Result<HashMap<String, Vec<String>>> {
 	let paths = fs::read_dir("/dev/input/")?;
 	let regex: Regex = Regex::new("^.*event\\d+$")?;
 	let mut ans = hashmap![];
@@ -49,7 +49,9 @@ pub fn get_all_uinput_device_names_to_paths() -> Result<HashMap<String, String>>
 		let device_path = path_buf.to_string_lossy();
 		if regex.is_match(&device_path) {
 			if let Some(device_name) = get_uinput_device_name(&device_path.to_string())? {
-				ans.insert(device_name, (*device_path.to_string()).to_string());
+				ans.entry(device_name)
+					.or_insert(Vec::new())
+					.push((*device_path.to_string()).to_string());
 			}
 		}
 	}

@@ -139,8 +139,10 @@ impl DeviceManager {
 	fn update_captured_kbs(&mut self) -> Result<Vec<Box<dyn EventObserver>>> {
 		let available_kb_names = util::get_all_uinput_device_names_to_paths()?;
 
-		let available_kb_paths: HashMap<&String, &String> =
-			available_kb_names.iter().map(|x| (x.1, x.0)).collect();
+		let available_kb_paths: HashMap<&String, &String> = available_kb_names
+			.iter()
+			.flat_map(|(name, paths)| paths.iter().map(|x| (x, name)).collect::<Vec<_>>())
+			.collect();
 
 		self.captured_kb_paths.retain(|x| {
 			if available_kb_paths.contains_key(x) {
@@ -155,30 +157,32 @@ impl DeviceManager {
 
 		for conf in self.conf.iter() {
 			for kb_name in conf.keyboards() {
-				if let Some(kb_path) = available_kb_names.get(kb_name) {
-					if !self.captured_kb_paths.contains(kb_path) {
-						let kb_new_name = format!("{}-{}", "Kbct", kb_name);
-						let file = util::open_readable_uinput_device(kb_path, true)?;
-						let raw_fd = file.as_raw_fd();
-						let device = util::create_writable_uinput_device(&kb_new_name)?;
-						let raw_buffer: util::KeyBuffer = [0; util::BUF_SIZE];
-						let kbct = Kbct::new(conf.clone(), util::linux_keyname_mapper)?;
+				if let Some(kb_paths) = available_kb_names.get(kb_name) {
+					for (i, kb_path) in kb_paths.iter().enumerate() {
+						if !self.captured_kb_paths.contains(kb_path) {
+							let kb_new_name = format!("{}-{}-{}", "Kbct", kb_name, i);
+							let file = util::open_readable_uinput_device(kb_path, true)?;
+							let raw_fd = file.as_raw_fd();
+							let device = util::create_writable_uinput_device(&kb_new_name)?;
+							let raw_buffer: util::KeyBuffer = [0; util::BUF_SIZE];
+							let kbct = Kbct::new(conf.clone(), util::linux_keyname_mapper)?;
 
-						let mapper = Box::new(KeyboardMapper {
-							file,
-							device,
-							raw_buffer,
-							kbct,
-							raw_fd,
-						});
+							let mapper = Box::new(KeyboardMapper {
+								file,
+								device,
+								raw_buffer,
+								kbct,
+								raw_fd,
+							});
 
-						ans.push(mapper);
-						self.captured_kb_paths.insert(kb_path.clone());
+							ans.push(mapper);
+							self.captured_kb_paths.insert(kb_path.clone());
 
-						info!(
-							"Capturing device path={} name={:?} mapped_name={:?}",
-							kb_path, kb_name, kb_new_name
-						)
+							info!(
+								"Capturing device path={} name={:?} mapped_name={:?}",
+								kb_path, kb_name, kb_new_name
+							)
+						}
 					}
 				}
 			}
@@ -290,8 +294,10 @@ fn start_mapper(config: KbctRootConf) -> Result<()> {
 }
 
 fn show_device_names() -> Result<()> {
-	for (name, path) in util::get_all_uinput_device_names_to_paths()? {
-		println!("{}\t{:?}", path, name)
+	for (name, paths) in util::get_all_uinput_device_names_to_paths()? {
+		for path in paths {
+			println!("{}\t{:?}", path, name)
+		}
 	}
 	Ok(())
 }
